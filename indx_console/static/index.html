@@ -1,0 +1,740 @@
+<!doctype html>
+<!-- Copyright (c) 2026 Pain Printing. Licensed under PolyForm Noncommercial 1.0.0 (see LICENSE). Commercial use requires permission. Unofficial project, not affiliated with Prusa Research. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>INDX Filament Console</title>
+<style>
+:root {
+  --bg: #0b0d0e; --panel: #171b1e; --panel-2: #22282c; --line: #2f373c;
+  --fg: #eef1f2; --muted: #8e999f; --accent: #f08a3a; --accent-ink: #1a0f05;
+  --green: #1d7a45; --green-ink: #f2fff7; --green-dark: #0c3a21;
+  --black: #000000; --black-line: #2b2b2b;
+  --yellow: #e8b931; --yellow-ink: #1f1700; --yellow-dark: #3b2d00;
+  --bad: #ef6461; --info: #6aa9ff;
+  --sans: system-ui, "Segoe UI", "DejaVu Sans", sans-serif;
+  --mono: ui-monospace, "DejaVu Sans Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 18px/1.3 var(--sans); user-select: none; overflow: hidden; }
+button { font: inherit; color: inherit; }
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+
+/* header */
+header { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.top { display: flex; align-items: center; gap: 12px; }
+.iconbtn { width: 52px; height: 52px; border-radius: 12px; border: 0; background: var(--panel-2); display: grid; place-items: center; cursor: pointer; flex: none; }
+.iconbtn svg { width: 26px; height: 26px; stroke: var(--fg); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.top h1 { font-size: 21px; margin: 0; font-weight: 650; }
+.link { font: 600 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--panel-2); color: var(--muted); }
+.link.usb { color: #9fe0bb; }
+.link.wifi { color: #ffd27a; }
+.link.none { color: #ffb3b1; }
+.state { margin-left: auto; font-weight: 650; padding: 6px 12px; border-radius: 999px; background: var(--panel-2); font-size: 15px; }
+.state.printing { background: var(--info); color: #06162b; }
+.state.busy { background: var(--yellow); color: var(--yellow-ink); }
+.state.off { background: #3b1c1c; color: #ffc4c2; }
+.stats { display: flex; gap: 18px; color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; padding-left: 2px; }
+.stats b { color: var(--fg); font-weight: 650; }
+.stats { align-items: center; }
+.batchbtn { margin-left: auto; font-weight: 700; font-size: 16px; border: 0; border-radius: 10px; padding: 10px 16px; min-height: 46px;
+  background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.batchbtn:disabled { opacity: .35; cursor: default; }
+/* print progress screen */
+.ringwrap { display: grid; place-items: center; margin: 18px 0 8px; position: relative; }
+.ringwrap svg { width: 340px; height: 340px; transform: rotate(-90deg); }
+.ringwrap .track { fill: none; stroke: var(--panel-2); stroke-width: 22; }
+.ringwrap .val { fill: none; stroke: var(--info); stroke-width: 22; stroke-linecap: round; transition: stroke-dashoffset .8s; }
+.ringtext { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; text-align: center; }
+.ringtext b { font-size: 64px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1; }
+.ringtext span { color: var(--muted); font-size: 18px; margin-top: 8px; }
+.pstats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.pstat { background: var(--panel); border-radius: 12px; padding: 10px 14px; }
+.pstat small { display: block; color: var(--muted); font-size: 13px; }
+.pstat b { font-size: 21px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ptools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ptool { display: flex; align-items: center; gap: 10px; background: var(--panel); border-radius: 12px; padding: 10px 12px; border: 2px solid transparent; }
+.ptool.hot { border-color: var(--accent); }
+.ptool .n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 750; border: 3px solid var(--green); flex: none; }
+.ptool.empty .n { border-color: #444; color: var(--muted); }
+.ptool .m { font-weight: 700; }
+.ptool .t { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+.ptool.hot .t { color: var(--accent); font-weight: 700; }
+.lockbar { margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: #1d2a3a; color: #b9d6ff; font-size: 16px; }
+.picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.pick { min-height: 84px; border-radius: 14px; border: 3px solid var(--line); background: #000; color: var(--fg); cursor: pointer;
+  display: grid; place-items: center; align-content: center; gap: 2px; }
+.pick b { font-size: 28px; }
+.pick small { font-size: 13px; color: var(--muted); }
+.pick.sel { border-color: var(--accent); background: #2a1606; }
+.pick.sel small { color: var(--accent); }
+.pick:disabled { opacity: .35; cursor: default; }
+.sensorgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sensor { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+.sensor b { display: block; font-size: 16px; }
+.toggle { display: flex; align-items: center; gap: 12px; font-size: 17px; cursor: pointer; padding: 6px 0; }
+.toggle input { width: 28px; height: 28px; accent-color: var(--accent); }
+.progress { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--info); width: 0; transition: width .5s; }
+.banner { padding: 10px 12px; border-radius: 10px; background: #3a2a14; color: #ffd9a8; font-size: 16px; }
+.banner.err { background: #3b1c1c; color: #ffc4c2; }
+.banner.info { background: #1d2a3a; color: #b9d6ff; cursor: pointer; }
+
+/* tool grid */
+main { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 10px; min-height: 0; }
+.tool { border-radius: 16px; padding: 12px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; min-height: 0; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; position: relative; }
+/* place-in-line number superimposed on a yellow card */
+.qpos { position: absolute; right: 8px; top: 50%; transform: translateY(-58%); font: 800 118px/1 var(--sans);
+  color: var(--yellow-ink); opacity: .2; pointer-events: none; letter-spacing: -.04em; }
+.qpos.now { opacity: .32; }
+.tool > .head, .tool > .body, .tool > .acts { position: relative; z-index: 1; }
+.sensed { display: inline-block; font: 700 12px var(--sans); padding: 2px 7px; border-radius: 6px; background: var(--yellow-ink); color: var(--yellow); }
+.tool.empty { background: var(--black); border-color: var(--black-line); color: var(--muted); }
+.tool.loaded { background: var(--green); color: var(--green-ink); }
+.tool.active { background: var(--yellow); color: var(--yellow-ink); }
+.tool.failed { border-color: #b3261e; }
+.head { display: flex; align-items: center; gap: 8px; }
+.num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 750; font-size: 19px; flex: none;
+  border: 3px solid currentColor; }
+.empty .num { color: #9aa3a8; }
+.tag { margin-left: auto; font: 700 12px var(--sans); text-transform: uppercase; letter-spacing: .07em; opacity: .85; }
+.body { display: grid; align-content: center; gap: 2px; min-width: 0; }
+.mat { font-size: 28px; font-weight: 750; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.empty .mat { font-size: 22px; font-weight: 600; color: #8b959a; }
+.line { font-size: 14px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { font-size: 14px; line-height: 1.25; font-weight: 550; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dotc { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: -1px; margin-right: 5px; border: 1px solid rgba(255,255,255,.5); }
+.bar { height: 7px; border-radius: 4px; background: rgba(0,0,0,.3); overflow: hidden; margin-top: 4px; }
+.bar > i { display: block; height: 100%; background: #c9f5da; }
+.bar.low > i { background: var(--yellow); }
+.bar.crit > i { background: var(--bad); }
+.acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.act { min-height: 50px; border-radius: 11px; border: 2px solid transparent; font-weight: 700; font-size: 17px; cursor: pointer; }
+.act:disabled { cursor: default; }
+/* black (empty) card */
+.empty .act.on { background: #ffffff; color: #000; }
+.empty .act.off { background: transparent; border-color: #262626; color: #3d3d3d; }
+/* green (loaded) card */
+.loaded .act.on { background: #ffffff; color: var(--green-dark); }
+.loaded .act.off { background: rgba(0,0,0,.18); color: rgba(255,255,255,.35); }
+/* yellow (in progress) card */
+.active .act.on { background: var(--yellow-ink); color: var(--yellow); }
+.active .act.ghost { background: transparent; border-color: rgba(31,23,0,.55); color: var(--yellow-ink); }
+.active .act.off { background: rgba(31,23,0,.12); color: rgba(31,23,0,.4); }
+
+footer { padding: 8px 16px 12px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; gap: 12px; }
+footer span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* full-screen panels */
+.screen { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 20; }
+.screen.open { display: flex; }
+.screen > .bar-top { display: flex; align-items: center; gap: 12px; padding: 14px 14px 12px; border-bottom: 1px solid var(--line); }
+.screen > .bar-top h2 { margin: 0; font-size: 24px; flex: 1; }
+.screen > .content { flex: 1; overflow-y: auto; padding: 4px 18px 28px; }
+.content h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 22px 0 10px; }
+.hint { color: var(--muted); font-size: 16px; margin: 10px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-weight: 650; font-size: 18px; padding: 12px 16px; min-height: 54px; min-width: 72px; border-radius: 11px; border: 2px solid var(--line);
+  background: var(--panel-2); cursor: pointer; }
+.chip.sel { border-color: var(--accent); color: var(--accent); }
+.swatch { width: 54px; height: 54px; border-radius: 11px; border: 3px solid var(--line); cursor: pointer; }
+.swatch.sel { border-color: var(--fg); }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { background: var(--panel-2); border-radius: 12px; padding: 10px 14px; cursor: pointer; border: 2px solid transparent; text-align: left; }
+.field.sel { border-color: var(--accent); }
+.field small { display: block; color: var(--muted); font-size: 13px; }
+.field span { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.pad button { font-weight: 650; font-size: 24px; min-height: 60px; border: 0; border-radius: 12px; background: var(--panel-2); cursor: pointer; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.btn { font-weight: 650; font-size: 19px; border: 0; border-radius: 12px; padding: 14px 20px; min-height: 60px; background: var(--panel-2); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.danger { background: #4a1c1c; color: #ffc9c7; }
+.btn.grow { flex: 1; }
+.btn:disabled { opacity: .4; cursor: default; }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row .k { color: var(--muted); width: 110px; flex: none; font-size: 16px; }
+.row .v { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+input[type=range] { width: 100%; height: 48px; accent-color: var(--accent); }
+input.text { width: 100%; font: 20px var(--sans); padding: 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel-2); color: var(--fg); user-select: text; }
+input.text:focus { outline: none; border-color: var(--accent); }
+pre.log { background: #000; color: #b9c4c9; font: 12px/1.35 var(--mono); padding: 10px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow-y: auto; user-select: text; }
+
+/* dialog + sleep + toast */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 30; padding: 20px; }
+.scrim.open { display: flex; }
+.dialog { background: var(--panel); border-radius: 18px; padding: 22px; width: 100%; max-width: 560px; }
+.dialog h2 { margin: 0 0 8px; font-size: 24px; }
+.dialog p { margin: 0; color: var(--muted); }
+#sleep { position: fixed; inset: 0; background: #000; z-index: 100; display: none; }
+#sleep.on { display: block; }
+#sleep.waking { display: block; background: transparent; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line);
+  padding: 12px 18px; border-radius: 12px; font-size: 17px; display: none; max-width: 92%; z-index: 60; }
+.toast.show { display: block; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+body.kiosk, body.kiosk * { cursor: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="top">
+      <button class="iconbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <h1>CORE One INDX</h1>
+      <span class="link none" id="link">Offline</span>
+      <span class="state off" id="state">Connecting</span>
+      <button class="iconbtn" id="sleepBtn" aria-label="Turn the screen off" hidden><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+    </div>
+    <div class="stats">
+      <span>Bed <b id="bed">–</b></span>
+      <span>Chamber <b id="chamber">–</b></span>
+      <button class="batchbtn" id="batchBtn">Batch load</button>
+      <button class="batchbtn" id="unbatchBtn" style="margin-left:0;background:var(--panel-2);color:var(--fg)">Batch unload</button>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+  <main id="tools"></main>
+  <footer><span id="foot">Starting…</span><span id="clock"></span></footer>
+</div>
+
+<!-- menu -->
+<section class="screen" id="menu" aria-label="Settings">
+  <div class="bar-top"><h2>Settings</h2><button class="iconbtn" data-close="menu" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="menuBody"></div>
+</section>
+
+<!-- load setup -->
+<section class="screen" id="load" aria-label="Load setup">
+  <div class="bar-top"><h2 id="loadTitle">Load tool</h2><button class="iconbtn" id="loadClose" aria-label="Cancel this load"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="loadBody"></div>
+</section>
+
+<!-- batch load -->
+<section class="screen" id="batch" aria-label="Batch load">
+  <div class="bar-top"><h2>Batch load</h2><button class="iconbtn" data-close="batch" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="batchBody"></div>
+</section>
+
+<!-- batch unload -->
+<section class="screen" id="unbatch" aria-label="Batch unload">
+  <div class="bar-top"><h2>Batch unload</h2><button class="iconbtn" data-close="unbatch" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="unbatchBody"></div>
+</section>
+
+<!-- tool details -->
+<section class="screen" id="detail" aria-label="Tool details">
+  <div class="bar-top"><h2 id="detailTitle">Tool</h2><button class="iconbtn" data-close="detail" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="detailBody"></div>
+</section>
+
+<!-- print progress -->
+<section class="screen" id="print" aria-label="Print progress">
+  <div class="bar-top"><h2>Printing</h2><button class="iconbtn" id="printClose" aria-label="Show the tools"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="content" id="printBody"></div>
+</section>
+
+<div class="scrim" id="confirm"><div class="dialog" id="confirmBody"></div></div>
+<div id="sleep"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KIOSK = new URLSearchParams(location.search).has("kiosk");
+if (KIOSK) document.body.classList.add("kiosk");
+const COLORS = ["#f2f2f2", "#1b1b1b", "#7d7d7d", "#e4322b", "#f08a3a", "#f5d33a", "#3fae49", "#2d6ee0", "#7b4bd6", "#e75ea7", "#8a5a2b", "#55c7c3"];
+const BRANDS = ["Prusament", "Polymaker", "Bambu", "eSun", "Overture", "Sunlu", "Other"];
+const ICON_X = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+let S = null;                 // latest /api/state
+let draft = null;             // load or detail form
+let padField = null, padFresh = false;
+let loadTool = null, detailTool = null;
+let lastTouch = Date.now(), asleep = false, lastErr = null;
+const cardCache = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const deg = (t, tg) => t == null ? "–" : `${Math.round(t)}°` + (tg ? ` → ${Math.round(tg)}°` : "");
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3800); }
+
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: {"Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || `Request failed (${r.status})`);
+  return j;
+}
+
+/* ---------------- polling + header ---------------- */
+async function poll() {
+  try { S = await api("GET", "/api/state"); render(); }
+  catch (e) { $("link").className = "link none"; $("link").textContent = "Offline"; $("state").textContent = "Console offline"; $("state").className = "state off"; }
+  setTimeout(poll, 1500);
+}
+
+function render() {
+  const lk = $("link");
+  lk.className = "link " + (S.link || "none");
+  lk.textContent = S.link === "usb" ? "USB" : S.link === "wifi" ? "Wi-Fi backup" : "Offline";
+
+  const st = $("state");
+  st.className = "state";
+  if (!S.link) { st.textContent = "Not connected"; st.classList.add("off"); }
+  else if (S.busy || S.queue_running) { st.textContent = S.waiting_for_user ? "Waiting at printer" : "Working"; st.classList.add("busy"); }
+  else if (S.printing) { st.textContent = "Printing"; st.classList.add("printing"); }
+  else st.textContent = "Idle";
+
+  $("batchBtn").disabled = !S.link || S.printing;
+  $("unbatchBtn").disabled = !S.link || S.printing || !S.tools.some(batchUnloadable);
+  $("bed").textContent = deg(S.bed_temp, S.bed_target);
+  $("chamber").textContent = S.chamber_temp == null ? "–" : `${Math.round(S.chamber_temp)}°`;
+  syncPrintScreen();
+
+  const b = $("banner");
+  if (!S.link) { b.hidden = false; b.className = "banner err"; b.textContent = S.last_error || "Plug the printer's lower rear USB-C port into the Pi."; }
+  else if (S.link === "wifi") { b.hidden = false; b.className = "banner"; b.textContent = "USB is disconnected. Using Wi-Fi backup: materials shown are the last ones the printer reported, and per-tool temperatures aren't available."; }
+  else if (S.waiting_for_user) { b.hidden = false; b.className = "banner"; b.textContent = "Follow the prompts on the printer's screen."; }
+  else if (S.printing) { b.hidden = false; b.className = "banner info"; b.textContent = `Printing ${Math.round(Number(S.progress) || 0)}% · tools locked · tap to show progress`; }
+  else if (S.last_error) { b.hidden = false; b.className = "banner err"; b.textContent = S.last_error; }
+  else b.hidden = true;
+
+  $("foot").textContent = S.link === "usb" ? `USB ${S.port || ""} · ${S.firmware || ""}` : S.link === "wifi" ? `Wi-Fi backup · ${S.settings.printer_host}` : "Looking for the printer…";
+
+  const grid = $("tools");
+  if (grid.children.length !== 8) { grid.innerHTML = ""; for (let i = 0; i < 8; i++) { const d = document.createElement("div"); grid.appendChild(d); } }
+  S.tools.forEach((t, i) => {
+    const html = cardHTML(t);
+    if (cardCache[i] !== html) { cardCache[i] = html; grid.children[i].outerHTML = html; }
+  });
+
+  if ($("menu").classList.contains("open")) renderMenuStatus();
+  autoWake();
+}
+
+/* ---------------- tool cards ---------------- */
+function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function lineInfo() {
+  const ts = S.tools || [];
+  return { waiting: ts.some(t => t.plan && t.plan.status === "queued"),
+           running: ts.some(t => (t.plan && t.plan.status === "running") || t.activity === "loading" || t.activity === "unloading") };
+}
+function cardHTML(t) {
+  const n = t.index + 1, p = t.plan, sp = t.spool;
+  const act = t.activity, loaded = !!t.material;
+  const hot = t.nozzle_target > 0;
+  let cls, tag, body, buttons;
+  // place in the load/unload line: the running one is 1, waiting ones follow (sensed filament first)
+  const line = lineInfo(), runningNow = (p && p.status === "running") || act === "loading" || act === "unloading";
+  let place = null;
+  if (line.waiting) {
+    if (p && p.status === "queued" && p.position) place = p.position + (line.running ? 1 : 0);
+    else if (runningNow) place = 1;
+  }
+
+  if (act || p) {
+    cls = "tool active" + (p && p.status === "failed" ? " failed" : "");
+    const mat = act === "unloading" ? (t.material || "filament") : (p ? p.material : t.material);
+    const waiting = t.activity_note === "waiting_user";
+    let title, note;
+    const unloadPlan = p && p.kind === "unload";
+    if (act === "unloading" || (unloadPlan && p.status === "running")) {
+      title = `Unloading ${esc(mat)}`;
+      note = waiting ? "Follow the printer's prompts, then pull the filament out." : "The printer is unloading this tool.";
+      tag = place ? "Unloading · 1st" : "Unloading";
+    } else if (act === "loading" || (p && p.status === "running")) {
+      title = `Loading ${esc(mat)}`;
+      note = waiting ? `Push ${esc(mat)} into tool ${n} until it stops, then tap Continue on the printer. Confirm extrusion when asked.`
+                     : "The printer is moving the tool into position.";
+      tag = place ? "Loading · 1st" : "Loading";
+    } else if (act === "unloading") {
+      title = `Unloading ${esc(mat)}`;
+      note = waiting ? "Follow the printer's prompts, then pull the filament out." : "The printer is unloading this tool.";
+      tag = "Unloading";
+    } else if (act === "setting") {
+      title = "Updating material"; note = `Telling the printer tool ${n} has ${esc(mat)}.`; tag = "Updating";
+    } else if (unloadPlan && p.status === "queued") {
+      title = `Unload next: ${esc(p.material)}`; note = "Starts as soon as the tool before it finishes."; tag = `${ordinal(place)} in line`;
+    } else if (unloadPlan && p.status === "failed") {
+      title = `${esc(p.material)} didn't unload`; note = esc(p.message || "Check the printer, then tap Retry."); tag = "Problem";
+    } else if (p.status === "queued") {
+      title = `${place === 2 ? "Next" : "Waiting"}: ${esc(p.material)}`; tag = `${ordinal(place)} in line`;
+      note = p.filament_ready ? `<span class="sensed">Filament sensed</span> Moved ahead of empty tools.`
+                              : "Starts when the tools before it finish. Have the filament ready.";
+    } else if (p.status === "failed") {
+      title = `${esc(p.material)} didn't load`; note = esc(p.message || "Check the printer, then tap Retry."); tag = "Problem";
+    } else {
+      title = `Ready: ${esc(p.material)}`; tag = "Set up";
+      note = sensorsLive() && S.settings.auto_start_on_sensor
+        ? `Feed filament into tool ${n}. It starts by itself when the sensor sees it, or tap Start.`
+        : `Tap Start when you're at the printer, then feed filament into tool ${n}.`;
+    }
+    const spoolLine = p && p.spool && p.spool.brand_name ? `<div class="line">${p.spool.primary_color ? `<span class="dotc" style="background:${esc(p.spool.primary_color)}"></span>` : ""}${esc(p.spool.brand_name)}</div>` : "";
+    body = `<div class="mat" style="font-size:22px">${title}</div>${spoolLine}<div class="note">${note}</div>${hot ? `<div class="line">Nozzle ${deg(t.nozzle_temp, t.nozzle_target)}</div>` : ""}`;
+    if (p && (p.status === "ready" || p.status === "failed") && S.printing) {
+      buttons = `<button class="act off" disabled>Locked</button>
+                 <button class="act ghost" onclick="cancelPlan(event,${t.index})">Cancel</button>`;
+    } else if (p && (p.status === "ready" || p.status === "failed")) {
+      buttons = `<button class="act on" onclick="startLoad(event,${t.index})">${p.status === "failed" ? "Retry" : "Start"}</button>
+                 <button class="act ghost" onclick="cancelPlan(event,${t.index})">Cancel</button>`;
+    } else if (p && p.status === "queued") {
+      buttons = `<button class="act off" disabled>Waiting</button><button class="act ghost" onclick="cancelPlan(event,${t.index})">Cancel</button>`;
+    } else {
+      buttons = `<button class="act off" disabled>Load</button><button class="act off" disabled>Unload</button>`;
+    }
+  } else if (loaded) {
+    cls = "tool loaded"; tag = t.material_source === "last_known" ? "Last known" : "Loaded";
+    const brand = sp ? [sp.brand_name, sp.material_name].filter(Boolean).join(" ") : "";
+    const color = sp && sp.primary_color ? `<span class="dotc" style="background:${esc(sp.primary_color)}"></span>` : "";
+    let rem = "";
+    if (sp && sp.remaining_weight != null) {
+      const pct = sp.remaining_pct ?? 0, c = pct < 10 ? "crit" : pct < 25 ? "low" : "";
+      rem = `<div class="line"><b>${Math.round(sp.remaining_weight)} g</b>${sp.remaining_length_m != null ? ` · ${Math.round(sp.remaining_length_m)} m` : ""} left</div><div class="bar ${c}"><i style="width:${pct}%"></i></div>`;
+    }
+    body = `<div class="mat">${esc(t.material)}</div>
+      ${brand || color ? `<div class="line">${color}${esc(brand || "Spool set")}</div>` : ""}
+      ${t.nozzle_temp != null ? `<div class="line">Nozzle ${deg(t.nozzle_temp, t.nozzle_target)}</div>` : ""}${rem}`;
+    const can = S.can_act;
+    buttons = `<button class="act off" disabled>Load</button>
+               <button class="act ${can ? "on" : "off"}" ${can ? "" : "disabled"} onclick="askUnload(event,${t.index})">Unload</button>`;
+  } else {
+    cls = "tool empty"; tag = S.filament_checked ? "Empty" : "Checking";
+    const atInlet = t.inlet && t.inlet.has_filament;
+    body = `<div class="mat">${S.filament_checked ? "Empty" : "…"}</div>${hot ? `<div class="line" style="color:var(--accent)">Nozzle ${deg(t.nozzle_temp, t.nozzle_target)}</div>` : ""}${atInlet ? `<div class="line" style="color:#ffd27a">Filament at the inlet</div>` : ""}`;
+    const can = !!S.link && !S.printing;   // tools are locked during a print
+    buttons = `<button class="act ${can ? "on" : "off"}" ${can ? "" : "disabled"} onclick="openLoad(event,${t.index})">Load</button>
+               <button class="act off" disabled>Unload</button>`;
+  }
+  return `<div class="${cls}" onclick="openDetail(${t.index})" role="group" aria-label="Tool ${n}">
+    ${place ? `<div class="qpos ${place === 1 ? "now" : ""}" aria-hidden="true">${place}</div>` : ""}
+    <div class="head"><span class="num">${n}</span><span class="tag">${tag}</span></div>
+    <div class="body">${body}</div>
+    <div class="acts">${buttons}</div></div>`;
+}
+
+/* ---------------- load setup screen ---------------- */
+function openLoad(ev, i) {
+  ev.stopPropagation();
+  loadTool = i;
+  const p = S.tools[i].plan;
+  const sp = (p && p.spool) || {};
+  draft = { material: p ? p.material : "", brand_name: sp.brand_name || "", primary_color: sp.primary_color || "",
+            actual_netto_full_weight: sp.actual_netto_full_weight ?? 1000, remaining_weight: sp.remaining_weight ?? "" };
+  padField = null;
+  $("loadTitle").textContent = `Load tool ${i + 1}`;
+  renderLoad();
+  $("load").classList.add("open");
+}
+function renderLoad() {
+  const d = draft, ready = !!d.material;
+  $("loadBody").innerHTML = `
+    <h3>Material</h3>
+    <div class="chips">${S.materials.map(m => `<button class="chip ${d.material === m ? "sel" : ""}" onclick="setDraft('material','${m}',renderLoad)">${m}</button>`).join("")}</div>
+    <h3>Spool (optional)</h3>
+    <div class="chips">${BRANDS.map(b => `<button class="chip ${d.brand_name === b ? "sel" : ""}" onclick="toggleDraft('brand_name','${b}',renderLoad)">${b}</button>`).join("")}</div>
+    <div class="chips" style="margin-top:10px">${COLORS.map(c => `<button class="swatch ${d.primary_color === c ? "sel" : ""}" style="background:${c}" aria-label="Color ${c}" onclick="toggleDraft('primary_color','${c}',renderLoad)"></button>`).join("")}</div>
+    <div class="fields" style="margin-top:12px">
+      ${fieldHTML("actual_netto_full_weight", "Full spool (filament)", "renderLoad")}
+      ${fieldHTML("remaining_weight", "Remaining (if used)", "renderLoad")}
+    </div>
+    ${padField ? padHTML("renderLoad") : ""}
+    <div class="btns">
+      <button class="btn primary grow" ${ready ? "" : "disabled"} onclick="submitLoad(false)">Add to load list</button>
+      <button class="btn grow" ${ready && S.can_act ? "" : "disabled"} onclick="submitLoad(true)">Load now</button>
+    </div>
+    ${S.printing ? `<p class="hint" style="color:#ffd27a">A print is running. You can add this to the load list now and tap Start on the card after the print.</p>` : ""}
+    <p class="hint">Set up every tool you want to load, then tap <b>Start</b> on each tool's card as you feed it, in any order. The X cancels this tool's load.</p>`;
+}
+async function submitLoad(now) {
+  const d = draft, spool = { brand_name: d.brand_name || null, primary_color: d.primary_color || null,
+    actual_netto_full_weight: d.actual_netto_full_weight === "" ? null : Number(d.actual_netto_full_weight),
+    remaining_weight: d.remaining_weight === "" ? null : Number(d.remaining_weight) };
+  try {
+    await api("POST", `/api/tools/${loadTool + 1}/plan`, { material: d.material, spool, start_now: now });
+    toast(now ? `Loading tool ${loadTool + 1}. Follow the printer's prompts.` : `Tool ${loadTool + 1} added. Tap Start on its card when you're ready.`);
+    $("load").classList.remove("open"); loadTool = null;
+  } catch (e) { toast(e.message); }
+}
+$("loadClose").onclick = async () => {
+  const i = loadTool; $("load").classList.remove("open"); loadTool = null;
+  if (i != null && S.tools[i].plan && S.tools[i].plan.status !== "running") {
+    try { await api("DELETE", `/api/tools/${i + 1}/plan`); toast(`Load for tool ${i + 1} cancelled.`); } catch (e) { toast(e.message); }
+  }
+};
+async function startLoad(ev, i) { ev.stopPropagation(); try { await api("POST", `/api/tools/${i + 1}/start`); toast(`Tool ${i + 1} started.`); } catch (e) { toast(e.message); } }
+async function cancelPlan(ev, i) { ev.stopPropagation(); try { await api("DELETE", `/api/tools/${i + 1}/plan`); toast(`Load for tool ${i + 1} cancelled.`); } catch (e) { toast(e.message); } }
+
+/* ---------------- unload ---------------- */
+function askUnload(ev, i) {
+  ev.stopPropagation();
+  const t = S.tools[i];
+  confirmDialog(`Unload tool ${i + 1}?`, `${esc(t.material || "The filament")} will be unloaded. The printer will ask you to pull it out.`, "Unload", async () => {
+    try { await api("POST", `/api/tools/${i + 1}/unload`); toast(`Unloading tool ${i + 1}. Follow the printer's prompts.`); } catch (e) { toast(e.message); }
+  });
+}
+function confirmDialog(title, text, okLabel, onOk, danger) {
+  $("confirmBody").innerHTML = `<h2>${title}</h2><p>${text}</p><div class="btns">
+    <button class="btn ${danger ? "danger" : "primary"} grow" id="cOk">${okLabel}</button><button class="btn grow" id="cNo">Cancel</button></div>`;
+  $("confirm").classList.add("open");
+  $("cNo").onclick = () => $("confirm").classList.remove("open");
+  $("cOk").onclick = () => { $("confirm").classList.remove("open"); onOk(); };
+}
+
+/* ---------------- tool details (tap a card) ---------------- */
+function openDetail(i) {
+  detailTool = i;
+  const t = S.tools[i], sp = t.spool || {};
+  draft = { material: t.material || "", brand_name: sp.brand_name || "", primary_color: sp.primary_color || "",
+            actual_netto_full_weight: sp.actual_netto_full_weight ?? "", remaining_weight: sp.remaining_weight ?? "", empty_container_weight: sp.empty_container_weight ?? "" };
+  padField = null;
+  $("detailTitle").textContent = `Tool ${i + 1}`;
+  renderDetail();
+  $("detail").classList.add("open");
+}
+function renderDetail() {
+  const t = S.tools[detailTool], d = draft;
+  $("detailBody").innerHTML = `
+    <div class="row"><span class="k">Printer says</span><span class="v">${t.material ? `<b>${esc(t.material)}</b>${t.material_source === "last_known" ? " (last known)" : ""}` : "Empty"}</span></div>
+    <div class="row"><span class="k">Nozzle</span><span class="v">${deg(t.nozzle_temp, t.nozzle_target)}</span></div>
+    <h3>Spool</h3>
+    <div class="chips">${BRANDS.map(b => `<button class="chip ${d.brand_name === b ? "sel" : ""}" onclick="toggleDraft('brand_name','${b}',renderDetail)">${b}</button>`).join("")}</div>
+    <div class="chips" style="margin-top:10px">${COLORS.map(c => `<button class="swatch ${d.primary_color === c ? "sel" : ""}" style="background:${c}" aria-label="Color ${c}" onclick="toggleDraft('primary_color','${c}',renderDetail)"></button>`).join("")}</div>
+    <div class="fields" style="margin-top:12px">
+      ${fieldHTML("actual_netto_full_weight", "Full spool (filament)", "renderDetail")}
+      ${fieldHTML("remaining_weight", "Remaining", "renderDetail")}
+      ${fieldHTML("empty_container_weight", "Empty spool", "renderDetail")}
+    </div>
+    ${padField ? padHTML("renderDetail") : ""}
+    ${S.printing ? `<div class="lockbar">A print is running. Tool changes are locked until it finishes.</div>` : ""}
+    <div class="btns"><button class="btn primary grow" ${S.printing ? "disabled" : ""} onclick="saveSpool()">Save spool</button><button class="btn danger" ${S.printing ? "disabled" : ""} onclick="clearSpool()">Clear spool</button></div>
+    <h3>Set material only</h3>
+    <p class="hint" style="margin:0 0 10px">For filament that's already in the tool. Nothing moves.</p>
+    <div class="chips">${S.materials.map(m => `<button class="chip ${d.material === m ? "sel" : ""}" onclick="setDraft('material','${m}',renderDetail)">${m}</button>`).join("")}</div>
+    <div class="btns"><button class="btn grow" ${S.can_act && d.material ? "" : "disabled"} onclick="setMaterial()">Set tool ${detailTool + 1} to ${esc(d.material || "…")}</button></div>`;
+}
+async function saveSpool() {
+  const d = draft, body = { material_type: d.material || null, brand_name: d.brand_name || null, primary_color: d.primary_color || null };
+  for (const k of ["actual_netto_full_weight", "remaining_weight", "empty_container_weight"]) body[k] = d[k] === "" ? null : Number(d[k]);
+  try { await api("PUT", `/api/tools/${detailTool + 1}/spool`, body); toast(`Saved spool for tool ${detailTool + 1}.`); $("detail").classList.remove("open"); } catch (e) { toast(e.message); }
+}
+async function clearSpool() { try { await api("DELETE", `/api/tools/${detailTool + 1}/spool`); toast(`Cleared spool for tool ${detailTool + 1}.`); $("detail").classList.remove("open"); } catch (e) { toast(e.message); } }
+async function setMaterial() { try { await api("POST", `/api/tools/${detailTool + 1}/material`, { material: draft.material }); toast(`Tool ${detailTool + 1} set to ${draft.material}.`); $("detail").classList.remove("open"); } catch (e) { toast(e.message); } }
+
+/* ---------------- shared form bits ---------------- */
+function setDraft(k, v, rerender) { draft[k] = v; rerender(); }
+function toggleDraft(k, v, rerender) { draft[k] = draft[k] === v ? "" : v; rerender(); }
+function fieldHTML(key, label, rr) { const v = draft[key]; return `<button class="field ${padField === key ? "sel" : ""}" onclick="pickField('${key}',${rr})"><small>${label}</small><span>${v === "" || v == null ? "–" : v + " g"}</span></button>`; }
+function pickField(key, rr) { padField = padField === key ? null : key; padFresh = true; rr(); }
+function padHTML(rr) { return `<div class="pad">${["1","2","3","4","5","6","7","8","9","⌫","0","Done"].map(k => `<button onclick="padKey('${k}',${rr})">${k}</button>`).join("")}</div>`; }
+function padKey(k, rr) {
+  let v = String(draft[padField] ?? "");
+  if (k === "Done") { padField = null; rr(); return; }
+  if (k === "⌫") v = padFresh ? "" : v.slice(0, -1);
+  else { if (padFresh) v = ""; if (v.length < 5) v = (v === "0" ? "" : v) + k; }
+  padFresh = false; draft[padField] = v; rr();
+}
+
+/* ---------------- batch load ---------------- */
+let batch = null;
+function sensorsLive() { return !!(S && S.sensors && S.sensors.receiving); }
+function batchSelectable(t) { return !t.material && !t.activity && !(t.plan && ["queued", "running"].includes(t.plan.status)); }
+$("batchBtn").onclick = () => {
+  batch = { material: "", tools: new Set(), brand_name: "", primary_color: "" };
+  renderBatch(); $("batch").classList.add("open");
+};
+function renderBatch() {
+  const b = batch, n = b.tools.size;
+  const sensed = i => !!(S.tools[i].inlet && S.tools[i].inlet.has_filament);
+  const order = [...b.tools].sort((x, y) => (sensed(x) ? 0 : 1) - (sensed(y) ? 0 : 1) || x - y)
+    .map(i => i + 1 + (sensed(i) ? " (filament sensed)" : "")).join(", ");
+  $("batchBody").innerHTML = `
+    <h3>Material</h3>
+    <div class="chips">${S.materials.map(m => `<button class="chip ${b.material === m ? "sel" : ""}" onclick="batch.material='${m}';renderBatch()">${m}</button>`).join("")}</div>
+    <h3>Tools</h3>
+    <div class="picker">${S.tools.map(t => { const ok = batchSelectable(t), sel = b.tools.has(t.index);
+      return `<button class="pick ${sel ? "sel" : ""}" ${ok ? "" : "disabled"} onclick="toggleBatchTool(${t.index})"><b>${t.index + 1}</b><small>${ok ? (sel ? "Selected" : "Empty") : (t.material ? esc(t.material) : "Busy")}</small></button>`; }).join("")}</div>
+    <div class="btns" style="margin-top:10px"><button class="btn grow" onclick="batchAll(true)">All empty tools</button><button class="btn grow" onclick="batchAll(false)">Clear</button></div>
+    <h3>Brand (optional, same for all)</h3>
+    <div class="chips">${BRANDS.map(x => `<button class="chip ${b.brand_name === x ? "sel" : ""}" onclick="batch.brand_name=batch.brand_name==='${x}'?'':'${x}';renderBatch()">${x}</button>`).join("")}</div>
+    <div class="btns">
+      <button class="btn primary grow" ${b.material && n ? "" : "disabled"} onclick="submitBatch(true)">Load ${n || ""} tool${n === 1 ? "" : "s"}${b.material ? " with " + b.material : ""}</button>
+    </div>
+    <p class="hint">${n ? `Order right now: tool ${order}. ` : ""}Tools whose side sensor already sees filament go first, then the rest, each group in number order. The order updates if you feed a waiting tool. Each card shows its place in line. Have the filament ready and follow the printer's prompts for each tool.</p>`;
+}
+function toggleBatchTool(i) { batch.tools.has(i) ? batch.tools.delete(i) : batch.tools.add(i); renderBatch(); }
+function batchAll(on) { batch.tools = new Set(on ? S.tools.filter(batchSelectable).map(t => t.index) : []); renderBatch(); }
+async function submitBatch(startNow) {
+  const spool = { brand_name: batch.brand_name || null };
+  try {
+    const r = await api("POST", "/api/batch", { material: batch.material, tools: [...batch.tools].map(i => i + 1), spool, start_now: startNow });
+    toast(`Loading ${batch.material} into tool${r.tools.length === 1 ? "" : "s"} ${r.tools.join(", ")}, in that order.`);
+    $("batch").classList.remove("open");
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------------- batch unload ---------------- */
+let unbatch = null;
+function batchUnloadable(t) { return !!t.material && !t.activity && !(t.plan && ["queued", "running"].includes(t.plan.status)); }
+$("unbatchBtn").onclick = () => { unbatch = new Set(); renderUnbatch(); $("unbatch").classList.add("open"); };
+function renderUnbatch() {
+  const n = unbatch.size, order = [...unbatch].sort((a, b) => a - b).map(i => i + 1).join(", ");
+  $("unbatchBody").innerHTML = `
+    <h3>Tools</h3>
+    <div class="picker">${S.tools.map(t => { const ok = batchUnloadable(t), sel = unbatch.has(t.index);
+      return `<button class="pick ${sel ? "sel" : ""}" ${ok ? "" : "disabled"} onclick="toggleUnbatch(${t.index})"><b>${t.index + 1}</b><small>${t.material ? esc(t.material) : "Empty"}${sel ? " · selected" : ""}</small></button>`; }).join("")}</div>
+    <div class="btns" style="margin-top:10px"><button class="btn grow" onclick="unbatchAll(true)">All loaded tools</button><button class="btn grow" onclick="unbatchAll(false)">Clear</button></div>
+    <div class="btns"><button class="btn primary grow" ${n ? "" : "disabled"} onclick="submitUnbatch()">Unload ${n || ""} tool${n === 1 ? "" : "s"}</button></div>
+    <p class="hint">${n ? `Unloads run in order: tool ${order}. ` : ""}Each one starts when the one before it finishes. Follow the printer's prompts and pull each filament out when asked.</p>`;
+}
+function toggleUnbatch(i) { unbatch.has(i) ? unbatch.delete(i) : unbatch.add(i); renderUnbatch(); }
+function unbatchAll(on) { unbatch = new Set(on ? S.tools.filter(batchUnloadable).map(t => t.index) : []); renderUnbatch(); }
+async function submitUnbatch() {
+  try {
+    const r = await api("POST", "/api/batch-unload", { tools: [...unbatch].map(i => i + 1) });
+    toast(`Unloading tool${r.tools.length === 1 ? "" : "s"} ${r.tools.join(", ")}, in that order.`);
+    $("unbatch").classList.remove("open");
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------------- menu ---------------- */
+$("menuBtn").onclick = () => { renderMenu(); $("menu").classList.add("open"); };
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => $(b.dataset.close).classList.remove("open"));
+let brightTimer = null;
+function renderMenu() {
+  const st = S.settings;
+  $("menuBody").innerHTML = `
+    <h3>Screen</h3>
+    <div class="row"><span class="k">Brightness</span><span class="v"><input type="range" id="bright" min="5" max="100" value="${st.brightness}" ${S.display_available ? "" : "disabled"}></span></div>
+    ${S.display_available ? "" : `<p class="hint">Brightness works on the Pi's touchscreen only.</p>`}
+    <div class="row" style="border:0"><span class="k">Sleep after</span><span class="v"><div class="chips" id="sleepChips">${st.sleep_choices.map(m => `<button class="chip ${st.sleep_minutes === m ? "sel" : ""}" data-m="${m}">${m === 0 ? "Never" : m + " min"}</button>`).join("")}</div></span></div>
+    <h3>Printer connection</h3>
+    <div id="connStatus"></div>
+    <h3>Wi-Fi backup</h3>
+    <p class="hint" style="margin:0 0 10px">Used only if USB is disconnected. Over Wi-Fi, the console loads and unloads by sending the printer a tiny G-code file and running it. The printer saves uploads to its USB flash drive, so the drive must be plugged into the printer, and each one shows up as a job in Prusa Connect.</p>
+    <input class="text" id="host" placeholder="Printer address (fills in automatically over USB)" value="${esc(st.printer_host)}" autocomplete="off">
+    <div class="btns" style="margin-top:8px"><button class="btn grow" id="fetchAddr" ${S.usb_connected ? "" : "disabled"}>Get address from printer</button></div>
+    <p class="hint" style="margin:6px 0 0">${st.printer_host_auto ? "Filled in from the printer over USB and kept up to date while USB is connected." : "Typed in by hand, so it isn't updated automatically. Tap Get address from printer to switch back."}</p>
+    <p class="hint" style="margin:14px 0 6px">The printer won't share its PrusaLink password over USB, so enter it once here. Find it on the printer under Settings → Network → PrusaLink.</p>
+    <input class="text" id="key" type="password" placeholder="${st.has_api_key ? "PrusaLink password (saved)" : "PrusaLink password, from the printer's Network menu"}" style="margin-top:10px" autocomplete="off">
+    <div class="btns"><button class="btn grow" id="testWifi">Test connection</button><button class="btn primary grow" id="saveWifi">Save</button></div>
+    <p class="hint">Test connection asks the printer for its status using this address and password, and tells you whether it answered. Nothing is saved until you tap Save.</p>
+    <p class="hint">No keyboard on the touchscreen? Open this console from your phone at <b>http://${esc(location.hostname === "localhost" ? (S.hostname || "raspberrypi") + ".local" : location.hostname)}:8080</b> and set it there.</p>
+    <h3>Filament sensors</h3>
+    <p class="hint" style="margin:0 0 10px">The printer can stream its side sensors to the console over your network. Turning it on asks you to confirm on the printer's screen once.</p>
+    <div id="sensorStatus"></div>
+    <div class="btns"><button class="btn grow" id="sensorSetup" ${S.usb_connected ? "" : "disabled"}>Turn on sensor reporting</button></div>
+    <label class="toggle" style="margin-top:12px"><input type="checkbox" id="autoStart" ${st.auto_start_on_sensor ? "checked" : ""}> Start a set-up load when its sensor sees filament</label>
+    <h3>Troubleshooting</h3>
+    <div class="btns"><button class="btn grow" id="showLog">Show printer log</button><button class="btn grow" id="refresh">Re-read printer</button></div>
+    <pre class="log" id="log" hidden></pre>
+    ${KIOSK ? `<h3>Console</h3><div class="btns"><button class="btn danger grow" id="exitBtn">Exit to desktop</button></div>
+      <p class="hint">To come back, open <b>INDX Console</b> from the desktop or menu, or restart the Pi.</p>` : ""}`;
+  renderMenuStatus();
+  const br = $("bright");
+  br.oninput = () => { clearTimeout(brightTimer); brightTimer = setTimeout(() => api("PUT", "/api/settings", { brightness: Number(br.value) }).catch(e => toast(e.message)), 150); };
+  $("sleepChips").onclick = async e => { const m = e.target.dataset.m; if (m == null) return; try { S.settings = await api("PUT", "/api/settings", { sleep_minutes: Number(m) }); renderMenu(); } catch (er) { toast(er.message); } };
+  $("fetchAddr").onclick = async () => {
+    try { const r = await api("POST", "/api/settings/fetch-address"); $("host").value = r.address; S.settings.printer_host = r.address; S.settings.printer_host_auto = true; toast(r.message); }
+    catch (e) { toast(e.message); }
+  };
+  $("testWifi").onclick = async () => { const r = await api("POST", "/api/settings/test-wifi", { printer_host: $("host").value, api_key: $("key").value }).catch(e => ({ message: e.message })); toast(r.message); };
+  $("saveWifi").onclick = async () => { const host = $("host").value.trim();
+    const body = { printer_host: host, printer_host_auto: host === "" || host === S.settings.printer_host && S.settings.printer_host_auto }; if ($("key").value) body.api_key = $("key").value;
+    try { S.settings = await api("PUT", "/api/settings", body); toast("Wi-Fi backup saved."); renderMenu(); } catch (e) { toast(e.message); } };
+  $("sensorSetup").onclick = async () => { try { const r = await api("POST", "/api/sensors/setup"); toast(r.message); } catch (e) { toast(e.message); } };
+  $("autoStart").onchange = async e => { try { S.settings = await api("PUT", "/api/settings", { auto_start_on_sensor: e.target.checked }); } catch (er) { toast(er.message); } };
+  $("showLog").onclick = async () => { const l = $("log"); const r = await api("GET", "/api/log"); l.textContent = r.lines.join("\n") || "Nothing received yet."; l.hidden = false; l.scrollTop = l.scrollHeight; };
+  $("refresh").onclick = async () => { await api("POST", "/api/refresh"); toast("Re-reading tools from the printer."); };
+  if (KIOSK) $("exitBtn").onclick = () => confirmDialog("Exit the console?", "The touchscreen will show the normal Raspberry Pi desktop.", "Exit", () => api("POST", "/api/exit"), true);
+}
+function renderMenuStatus() {
+  const el = $("connStatus"); if (!el || !S) return;
+  const ss = $("sensorStatus");
+  if (ss) ss.innerHTML = `<div class="sensorgrid">${S.tools.map(t => { const v = t.inlet || {}, c = (S.sensors && S.sensors.counts[t.index + 1]) || 0;
+    return `<div class="sensor"><b>Tool ${t.index + 1}</b>${v.live ? esc(v.state) : (c ? "stale" : "no data")}<br><small style="color:var(--muted)">${c} reports</small></div>`; }).join("")}</div>`;
+  const w = S.wifi;
+  el.innerHTML = `
+    <div class="row"><span class="k">USB</span><span class="v">${S.usb_connected ? `Connected · ${esc(S.port)}` : "Not connected"}</span></div>
+    <div class="row"><span class="k">Wi-Fi</span><span class="v">${!w.configured ? "Not set up" : w.reachable ? `Reachable · printer ${esc((w.printer_state || "").toLowerCase())}` : esc(w.last_error || "Not reachable")}</span></div>
+    <div class="row"><span class="k">Sensors</span><span class="v">${!S.sensors ? "Off" : S.sensors.error ? esc(S.sensors.error) : S.sensors.receiving ? "Receiving" : "Nothing received yet"}</span></div>
+    <div class="row"><span class="k">In use</span><span class="v">${S.link === "usb" ? "USB" : S.link === "wifi" ? "Wi-Fi backup" : "None"}</span></div>`;
+}
+
+/* ---------------- print progress screen ---------------- */
+let printDismissed = false, wasPrinting = false;
+const fmtMin = m => m == null ? "–" : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+const fmtSec = s => s == null ? "–" : fmtMin(Math.floor(s / 60));
+function syncPrintScreen() {
+  if (S.printing && !wasPrinting) printDismissed = false;      // a new print: show it
+  wasPrinting = S.printing;
+  const scr = $("print");
+  if (!S.printing) scr.classList.remove("open");
+  else if (!printDismissed && !asleep) scr.classList.add("open");
+  if (scr.classList.contains("open")) renderPrint();
+}
+function showPrintScreen() { if (S && S.printing) { printDismissed = false; $("print").classList.add("open"); renderPrint(); } }
+$("banner").onclick = () => { if (S && S.printing) showPrintScreen(); };
+$("state").onclick = () => { if (S && S.printing) showPrintScreen(); };
+$("printClose").onclick = () => { printDismissed = true; $("print").classList.remove("open"); };
+function renderPrint() {
+  const pct = Math.max(0, Math.min(100, Number(S.progress) || 0)), pr = S.print || {};
+  const R = 150, C = 2 * Math.PI * R;
+  const used = S.tools.filter(t => t.material || t.nozzle_target > 0);
+  $("printBody").innerHTML = `
+    <div class="ringwrap">
+      <svg viewBox="0 0 340 340" aria-hidden="true"><circle class="track" cx="170" cy="170" r="${R}"/>
+        <circle class="val" cx="170" cy="170" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/></svg>
+      <div class="ringtext"><b>${Math.round(pct)}%</b><span>${pr.time_left_min != null ? `${fmtMin(pr.time_left_min)} left` : "Working out time left"}</span></div>
+    </div>
+    <div class="pstats">
+      <div class="pstat" style="grid-column:1 / -1"><small>File</small><b>${esc(pr.file_name ? pr.file_name.split("/").pop() : "–")}</b></div>
+      <div class="pstat"><small>Printing for</small><b>${fmtSec(pr.elapsed_s)}</b></div>
+      <div class="pstat"><small>Time left</small><b>${fmtMin(pr.time_left_min)}</b></div>
+      <div class="pstat"><small>Bed</small><b>${deg(S.bed_temp, S.bed_target)}</b></div>
+      <div class="pstat"><small>Chamber</small><b>${S.chamber_temp == null ? "–" : Math.round(S.chamber_temp) + "°"}</b></div>
+    </div>
+    <h3>Tools</h3>
+    <div class="ptools">${used.length ? used.map(t => `<div class="ptool ${t.material ? "" : "empty"} ${t.nozzle_target > 0 ? "hot" : ""}">
+        <span class="n">${t.index + 1}</span><span class="m">${esc(t.material || "Empty")}</span><span class="t">${deg(t.nozzle_temp, t.nozzle_target)}</span></div>`).join("")
+      : `<p class="hint">No tool information yet.</p>`}</div>
+    <div class="lockbar">Loading and unloading are locked until the print finishes. Tap X to see the tool cards.</div>`;
+}
+
+/* ---------------- sleep ---------------- */
+document.addEventListener("pointerdown", () => { lastTouch = Date.now(); }, true);
+for (const ev of ["pointerdown", "pointerup", "click", "touchstart", "touchend"]) {
+  $("sleep").addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); if (ev === "pointerdown") wake(); }, { capture: true, passive: false });
+}
+if (KIOSK) $("sleepBtn").hidden = false;
+$("sleepBtn").onclick = e => { e.stopPropagation(); goSleep(); };
+function goSleep() { if (asleep) return; asleep = true; $("sleep").className = "on"; api("POST", "/api/display/sleep").catch(() => {}); }
+function wake() {
+  if (!asleep) return;
+  asleep = false; lastTouch = Date.now();
+  const s = $("sleep"); s.className = "waking";          // stays in place, invisible, to swallow the waking tap
+  setTimeout(() => { if (!asleep) s.className = ""; }, 700);
+  api("POST", "/api/display/wake").catch(() => {});
+  showPrintScreen();                                   // while printing, waking shows the progress screen
+}
+function autoWake() {
+  if (!S) return;
+  const needsEyes = S.waiting_for_user || S.busy || S.queue_running;
+  if (needsEyes) lastTouch = Date.now();
+  if (S.last_error && S.last_error !== lastErr) { lastTouch = Date.now(); if (asleep) wake(); }
+  lastErr = S.last_error;
+  if (needsEyes && asleep) wake();
+}
+setInterval(() => {
+  if (!KIOSK || !S || asleep) return;
+  const mins = S.settings.sleep_minutes;
+  const panelOpen = document.querySelector(".screen.open:not(#print), .scrim.open");
+  if (mins > 0 && !panelOpen && Date.now() - lastTouch > mins * 60000) goSleep();
+}, 5000);
+
+setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }, 1000);
+poll();
+</script>
+</body>
+</html>
